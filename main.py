@@ -31,6 +31,7 @@ STATE_PACKAGE = "package"
 STATE_SUPPORT = "support"
 
 STATE_ADMIN_USERS = "admin_users"
+STATE_ADMIN_USER_DETAILS = "admin_user_details"
 STATE_ADMIN_DEPOSITS = "admin_deposits"
 STATE_ADMIN_WITHDRAWALS = "admin_withdrawals"
 STATE_ADMIN_DEPOSIT_METHODS = "admin_deposit_methods"
