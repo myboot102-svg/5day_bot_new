@@ -4,34 +4,34 @@ from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import (
     Application,
     CommandHandler,
-    MessageHandler,
     ContextTypes,
-    filters,
 )
 
 
-# ==================================================
+# ==========================================
 # الإعدادات
-# ==================================================
+# ==========================================
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 
 ADMIN_ID = 8460661282
 
 
-# ==================================================
+# ==========================================
 # STATES
-# ==================================================
+# ==========================================
 
 STATE_NONE = "none"
 
 STATE_DEPOSIT = "deposit"
 STATE_WITHDRAW = "withdraw"
-STATE_PACKAGE = "package"
+STATE_PACKAGES = "packages"
+STATE_PACKAGE_STATUS = "package_status"
+STATE_ACCOUNT = "account"
+STATE_REFERRAL = "referral"
 STATE_SUPPORT = "support"
 
 STATE_ADMIN_USERS = "admin_users"
-STATE_ADMIN_USER_DETAILS = "admin_user_details"
 STATE_ADMIN_DEPOSITS = "admin_deposits"
 STATE_ADMIN_WITHDRAWALS = "admin_withdrawals"
 STATE_ADMIN_DEPOSIT_METHODS = "admin_deposit_methods"
@@ -41,59 +41,9 @@ STATE_ADMIN_SUPPORT = "admin_support"
 STATE_ADMIN_PACKAGES = "admin_packages"
 
 
-# ==================================================
-# مستخدمين مؤقتين
-# ==================================================
-
-users = {}
-
-
-# ==================================================
-# إنشاء مستخدم
-# ==================================================
-
-def get_user(user_id, update=None):
-
-    if user_id not in users:
-
-        name = ""
-        username = ""
-
-        if update and update.effective_user:
-            name = update.effective_user.first_name or ""
-            username = update.effective_user.username or ""
-
-        users[user_id] = {
-            "user_id": user_id,
-            "name": name,
-            "username": username,
-
-            "role": "user",
-            "state": STATE_NONE,
-
-            "blocked": False,
-            "balance": 0,
-
-            "active_package": None,
-            "package_price": 0,
-            "package_withdrawn": 0,
-            "package_total_days": 0,
-            "package_elapsed_days": 0,
-            "package_remaining_days": 0,
-
-            "total_packages": 0,
-            "total_days": 0,
-            "total_deposits": 0,
-            "capital": 0,
-            "total_withdrawals": 0,
-        }
-
-    return users[user_id]
-
-
-# ==================================================
+# ==========================================
 # كيبورد المستخدم
-# ==================================================
+# ==========================================
 
 def user_keyboard(is_admin=False):
 
@@ -113,9 +63,9 @@ def user_keyboard(is_admin=False):
     )
 
 
-# ==================================================
-# كيبورد الأدمن
-# ==================================================
+# ==========================================
+# كيبورد لوحة الإدارة
+# ==========================================
 
 def admin_keyboard():
 
@@ -133,21 +83,34 @@ def admin_keyboard():
     )
 
 
-# ==================================================
-# كيبورد الرجوع
-# ==================================================
+# ==========================================
+# رسالة الترحيب
+# ==========================================
 
-def back_keyboard():
+WELCOME_MESSAGE = """
+أهلاً بك في بوت 5day للاستثمار الذكي.
 
-    return ReplyKeyboardMarkup(
-        [["رجوع"]],
-        resize_keyboard=True
-    )
+يسعدنا انضمامك إلينا، نحن نوفر لك منصة آمنة وموثوقة لنمو رأس مالك من خلال خطط استثمارية قصيرة الأمد.
+
+تعريف برنامج الاستثمار:
+
+مدة الاستثمار: 5 أيام فقط لكل دورة استثمارية.
+
+نظام الأرباح: تحصل على ربح 500 دينار لكل 10,000 دينار.
+
+الشروط والأحكام:
+
+- يحق لكل مستخدم باقة واحدة فقط.
+- يتم تجميد رأس المال لمدة 5 أيام.
+- يمكن سحب الأرباح يومياً.
+- يمكن التجديد بعد انتهاء الباقة.
+- تتحرر الأرباح مع رأس المال بعد انتهاء المدة.
+"""
 
 
-# ==================================================
+# ==========================================
 # START
-# ==================================================
+# ==========================================
 
 async def start(
     update: Update,
@@ -156,419 +119,23 @@ async def start(
 
     user_id = update.effective_user.id
 
-    user = get_user(
-        user_id,
-        update
-    )
-
-    # الأدمن
-    if user_id == ADMIN_ID:
-
-        user["role"] = "admin"
-
-        await update.message.reply_text(
-            "مرحباً بك في 5DAY.",
-            reply_markup=user_keyboard(
-                is_admin=True
-            )
-        )
-
-        return
-
-    # المستخدم
-    await update.message.reply_text(
-        "أهلاً بك في 5DAY.\n\n"
-        "اختر من القائمة:",
-        reply_markup=user_keyboard()
-    )
-
-
-# ==================================================
-# قسم المستخدم
-# ==================================================
-
-async def user_section(
-    update: Update,
-    title: str,
-    state: str
-):
-
-    user_id = update.effective_user.id
-
-    user = get_user(
-        user_id,
-        update
-    )
-
-    user["state"] = state
+    is_admin = user_id == ADMIN_ID
 
     await update.message.reply_text(
-        title,
-        reply_markup=back_keyboard()
+        WELCOME_MESSAGE,
+        reply_markup=user_keyboard(
+            is_admin=is_admin
+        )
     )
 
 
-# ==================================================
-# لوحة الأدمن
-# ==================================================
-
-async def admin_panel(update: Update):
-
-    if update.effective_user.id != ADMIN_ID:
-        return
-
-    user = get_user(
-        update.effective_user.id,
-        update
-    )
-
-    user["state"] = STATE_NONE
-
-    await update.message.reply_text(
-        "لوحة الإدارة:",
-        reply_markup=admin_keyboard()
-    )
-
-
-# ==================================================
-# قسم الأدمن
-# ==================================================
-
-async def admin_section(
-    update: Update,
-    title: str,
-    state: str
-):
-
-    if update.effective_user.id != ADMIN_ID:
-        return
-
-    user = get_user(
-        update.effective_user.id,
-        update
-    )
-
-    user["state"] = state
-
-    await update.message.reply_text(
-        title,
-        reply_markup=back_keyboard()
-    )
-
-
-# ==================================================
-# Message Router
-# ==================================================
-
-async def message_handler(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE
-):
-
-    if not update.message:
-        return
-
-    text = update.message.text
-
-    user_id = update.effective_user.id
-
-    user = get_user(
-        user_id,
-        update
-    )
-
-    # ==================================================
-    # رجوع
-    # ==================================================
-
-    if text == "رجوع":
-
-        user["state"] = STATE_NONE
-
-        if user_id == ADMIN_ID:
-
-            await update.message.reply_text(
-                "القائمة الرئيسية:",
-                reply_markup=user_keyboard(
-                    is_admin=True
-                )
-            )
-
-        else:
-
-            await update.message.reply_text(
-                "القائمة الرئيسية:",
-                reply_markup=user_keyboard()
-            )
-
-        return
-
-
-    # ==================================================
-    # لوحة الإدارة
-    # ==================================================
-
-    if text == "لوحة الإدارة":
-
-        if user_id == ADMIN_ID:
-
-            await admin_panel(
-                update
-            )
-
-        return
-
-
-    # ==================================================
-    # المستخدم
-    # ==================================================
-
-    if text == "الباقات":
-
-        await user_section(
-            update,
-            "قسم الباقات.",
-            STATE_PACKAGE
-        )
-
-        return
-
-
-    if text == "الإيداع":
-
-        await user_section(
-            update,
-            "قسم الإيداع.",
-            STATE_DEPOSIT
-        )
-
-        return
-
-
-    if text == "السحب":
-
-        await user_section(
-            update,
-            "قسم السحب.",
-            STATE_WITHDRAW
-        )
-
-        return
-
-
-    if text == "حالة الباقة":
-
-        await user_section(
-            update,
-            "قسم حالة الباقة.",
-            STATE_PACKAGE
-        )
-
-        return
-
-
-    if text == "حسابي":
-
-        await user_section(
-            update,
-            "قسم حسابي.",
-            STATE_NONE
-        )
-
-        return
-
-
-    if text == "الإحالة":
-
-        await user_section(
-            update,
-            "قسم الإحالة.",
-            STATE_NONE
-        )
-
-        return
-
-
-    if text == "الدعم":
-
-        await user_section(
-            update,
-            "قسم الدعم.",
-            STATE_SUPPORT
-        )
-
-        return
-
-
-    # ==================================================
-    # الأدمن
-    # ==================================================
-
-    
-
-    if user.get("state") == STATE_ADMIN_USERS:
-
-        for uid, item in users.items():
-
-            name = item.get("name") or "بدون اسم"
-            status = "محظور" if item.get("blocked") else "نشط"
-
-            if text == f"{name} | {status}":
-
-                user["selected_user_id"] = uid
-                user["state"] = STATE_ADMIN_USER_DETAILS
-
-                if item.get("active_package"):
-
-                    package_text = (
-                        f"الباقة: {item['active_package']}\n"
-                        f"السعر: {item['package_price']:,}\n"
-                        f"المسحوب: {item['package_withdrawn']:,}\n"
-                        f"مدة الباقة: {item['package_total_days']} يوم\n"
-                        f"صارلها: {item['package_elapsed_days']} يوم\n"
-                        f"باقيلها: {item['package_remaining_days']} يوم"
-                    )
-
-                else:
-                    package_text = "لا توجد باقة نشطة."
-
-                status_text = (
-                    "محظور"
-                    if item.get("blocked")
-                    else "نشط"
-                )
-
-                message = f"""
-معلومات المستخدم.
-
-الاسم: {item['name']}
-المعرف: @{item['username']}
-ID: {item['user_id']}
-
-الحالة: {status_text}
-
-{package_text}
-
-عدد الباقات: {item['total_packages']}
-إجمالي الأيام: {item['total_days']}
-
-إجمالي الإيداعات: {item['total_deposits']:,}
-رأس المال: {item['capital']:,}
-إجمالي السحوبات: {item['total_withdrawals']:,}
-
-الرصيد الحالي: {item['balance']:,}
-"""
-
-                keyboard = [
-                    ["إضافة رصيد", "خصم رصيد"],
-                    ["حظر المستخدم", "فك الحظر"],
-                    ["رجوع للمستخدمين"],
-                ]
-
-                await update.message.reply_text(
-                    message,
-                    reply_markup=ReplyKeyboardMarkup(
-                        keyboard,
-                        resize_keyboard=True
-                    )
-                )
-
-                return
-
-    if text == "المستخدمين":
-
-        user["state"] = STATE_ADMIN_USERS
-
-        keyboard = []
-
-        for uid, item in users.items():
-
-            name = item.get("name") or "بدون اسم"
-            status = "محظور" if item.get("blocked") else "نشط"
-
-            keyboard.append([
-                f"{name} | {status}"
-            ])
-
-        keyboard.append(["رجوع"])
-
-        await update.message.reply_text(
-            "المستخدمين:",
-            reply_markup=ReplyKeyboardMarkup(
-                keyboard,
-                resize_keyboard=True
-            )
-        )
-
-        return
-
-        elif text == "الإيداعات":
-
-            await admin_section(
-                update,
-                "قسم الإيداعات.",
-                STATE_ADMIN_DEPOSITS
-            )
-
-        elif text == "السحوبات":
-
-            await admin_section(
-                update,
-                "قسم السحوبات.",
-                STATE_ADMIN_WITHDRAWALS
-            )
-
-        elif text == "طرق الإيداع":
-
-            await admin_section(
-                update,
-                "قسم طرق الإيداع.",
-                STATE_ADMIN_DEPOSIT_METHODS
-            )
-
-        elif text == "طرق السحب":
-
-            await admin_section(
-                update,
-                "قسم طرق السحب.",
-                STATE_ADMIN_WITHDRAW_METHODS
-            )
-
-        elif text == "رسالة جماعية":
-
-            await admin_section(
-                update,
-                "قسم الرسالة الجماعية.",
-                STATE_ADMIN_BROADCAST
-            )
-
-        elif text == "رسائل الدعم":
-
-            await admin_section(
-                update,
-                "قسم رسائل الدعم.",
-                STATE_ADMIN_SUPPORT
-            )
-
-        elif text == "إدارة الباقات":
-
-            await admin_section(
-                update,
-                "قسم إدارة الباقات.",
-                STATE_ADMIN_PACKAGES
-            )
-
-        return
-
-
-# ==================================================
-# MAIN
-# ==================================================
+# ==========================================
+# تشغيل البوت
+# ==========================================
 
 def main():
 
     if not BOT_TOKEN:
-
         raise ValueError(
             "BOT_TOKEN غير موجود في Railway Variables"
         )
@@ -584,23 +151,12 @@ def main():
         )
     )
 
-    app.add_handler(
-        MessageHandler(
-            filters.TEXT & ~filters.COMMAND,
-            message_handler
-        )
-    )
-
-    print(
-        "5DAY Bot is running..."
-    )
-
     app.run_polling()
 
 
-# ==================================================
-# تشغيل البوت
-# ==================================================
+# ==========================================
+# تشغيل
+# ==========================================
 
 if __name__ == "__main__":
     main()
