@@ -38,10 +38,6 @@ STATE_ADMIN_WITHDRAW_METHODS = "admin_withdraw_methods"
 STATE_ADMIN_BROADCAST = "admin_broadcast"
 STATE_ADMIN_SUPPORT = "admin_support"
 STATE_ADMIN_PACKAGES = "admin_packages"
-STATE_ADMIN_AGENTS = "admin_agents"
-
-STATE_AGENT_DEPOSITS = "agent_deposits"
-STATE_AGENT_WITHDRAWALS = "agent_withdrawals"
 
 
 # ==================================================
@@ -70,9 +66,7 @@ def get_user(user_id, update=None):
             "user_id": user_id,
             "name": name,
             "username": username,
-
             "role": "user",
-
             "state": STATE_NONE,
         }
 
@@ -83,7 +77,7 @@ def get_user(user_id, update=None):
 # كيبورد المستخدم
 # ==================================================
 
-def user_keyboard(is_admin=False, is_agent=False):
+def user_keyboard(is_admin=False):
 
     keyboard = [
         ["الباقات", "الإيداع"],
@@ -94,9 +88,6 @@ def user_keyboard(is_admin=False, is_agent=False):
 
     if is_admin:
         keyboard.append(["لوحة الإدارة"])
-
-    elif is_agent:
-        keyboard.append(["لوحة الوكيل"])
 
     return ReplyKeyboardMarkup(
         keyboard,
@@ -115,26 +106,6 @@ def admin_keyboard():
         ["السحوبات", "طرق الإيداع"],
         ["طرق السحب", "رسالة جماعية"],
         ["رسائل الدعم", "إدارة الباقات"],
-        ["إدارة الوكلاء"],
-        ["رجوع"],
-    ]
-
-    return ReplyKeyboardMarkup(
-        keyboard,
-        resize_keyboard=True
-    )
-
-
-# ==================================================
-# كيبورد الوكيل
-# ==================================================
-
-def agent_keyboard():
-
-    keyboard = [
-        ["إيداعاتي", "سحوباتي"],
-        ["إجمالي الإيداعات", "إجمالي السحوبات"],
-        ["المستخدمين المرتبطين"],
         ["رجوع"],
     ]
 
@@ -186,19 +157,7 @@ async def start(
 
         return
 
-    # الوكيل
-    if user.get("role") == "agent":
-
-        await update.message.reply_text(
-            "مرحباً بك في 5DAY.",
-            reply_markup=user_keyboard(
-                is_agent=True
-            )
-        )
-
-        return
-
-    # المستخدم العادي
+    # المستخدم
     await update.message.reply_text(
         "أهلاً بك في 5DAY.\n\n"
         "اختر من القائمة:",
@@ -207,12 +166,11 @@ async def start(
 
 
 # ==================================================
-# القسم الرئيسي للمستخدم
+# قسم المستخدم
 # ==================================================
 
 async def user_section(
     update: Update,
-    context: ContextTypes.DEFAULT_TYPE,
     title: str,
     state: str
 ):
@@ -236,10 +194,7 @@ async def user_section(
 # لوحة الأدمن
 # ==================================================
 
-async def admin_panel(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE
-):
+async def admin_panel(update: Update):
 
     if update.effective_user.id != ADMIN_ID:
         return
@@ -258,32 +213,7 @@ async def admin_panel(
 
 
 # ==================================================
-# لوحة الوكيل
-# ==================================================
-
-async def agent_panel(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE
-):
-
-    user = get_user(
-        update.effective_user.id,
-        update
-    )
-
-    if user.get("role") != "agent":
-        return
-
-    user["state"] = STATE_NONE
-
-    await update.message.reply_text(
-        "لوحة الوكيل:",
-        reply_markup=agent_keyboard()
-    )
-
-
-# ==================================================
-# الأدمن - الأقسام
+# قسم الأدمن
 # ==================================================
 
 async def admin_section(
@@ -299,32 +229,6 @@ async def admin_section(
         update.effective_user.id,
         update
     )
-
-    user["state"] = state
-
-    await update.message.reply_text(
-        title,
-        reply_markup=back_keyboard()
-    )
-
-
-# ==================================================
-# الوكيل - الأقسام
-# ==================================================
-
-async def agent_section(
-    update: Update,
-    title: str,
-    state: str
-):
-
-    user = get_user(
-        update.effective_user.id,
-        update
-    )
-
-    if user.get("role") != "agent":
-        return
 
     user["state"] = state
 
@@ -355,14 +259,8 @@ async def message_handler(
         update
     )
 
-    role = user.get(
-        "role",
-        "user"
-    )
-
-
     # ==================================================
-    # الرجوع
+    # رجوع
     # ==================================================
 
     if text == "رجوع":
@@ -375,15 +273,6 @@ async def message_handler(
                 "القائمة الرئيسية:",
                 reply_markup=user_keyboard(
                     is_admin=True
-                )
-            )
-
-        elif role == "agent":
-
-            await update.message.reply_text(
-                "القائمة الرئيسية:",
-                reply_markup=user_keyboard(
-                    is_agent=True
                 )
             )
 
@@ -404,24 +293,9 @@ async def message_handler(
     if text == "لوحة الإدارة":
 
         if user_id == ADMIN_ID:
+
             await admin_panel(
-                update,
-                context
-            )
-
-        return
-
-
-    # ==================================================
-    # لوحة الوكيل
-    # ==================================================
-
-    if text == "لوحة الوكيل":
-
-        if role == "agent":
-            await agent_panel(
-                update,
-                context
+                update
             )
 
         return
@@ -435,7 +309,6 @@ async def message_handler(
 
         await user_section(
             update,
-            context,
             "قسم الباقات.",
             STATE_PACKAGE
         )
@@ -447,7 +320,6 @@ async def message_handler(
 
         await user_section(
             update,
-            context,
             "قسم الإيداع.",
             STATE_DEPOSIT
         )
@@ -459,7 +331,6 @@ async def message_handler(
 
         await user_section(
             update,
-            context,
             "قسم السحب.",
             STATE_WITHDRAW
         )
@@ -471,7 +342,6 @@ async def message_handler(
 
         await user_section(
             update,
-            context,
             "قسم حالة الباقة.",
             STATE_PACKAGE
         )
@@ -483,7 +353,6 @@ async def message_handler(
 
         await user_section(
             update,
-            context,
             "قسم حسابي.",
             STATE_NONE
         )
@@ -495,7 +364,6 @@ async def message_handler(
 
         await user_section(
             update,
-            context,
             "قسم الإحالة.",
             STATE_NONE
         )
@@ -507,7 +375,6 @@ async def message_handler(
 
         await user_section(
             update,
-            context,
             "قسم الدعم.",
             STATE_SUPPORT
         )
@@ -585,63 +452,6 @@ async def message_handler(
                 STATE_ADMIN_PACKAGES
             )
 
-        elif text == "إدارة الوكلاء":
-
-            await admin_section(
-                update,
-                "قسم إدارة الوكلاء.",
-                STATE_ADMIN_AGENTS
-            )
-
-        return
-
-
-    # ==================================================
-    # الوكيل
-    # ==================================================
-
-    if role == "agent":
-
-        if text == "إيداعاتي":
-
-            await agent_section(
-                update,
-                "قسم إيداعاتي.",
-                STATE_AGENT_DEPOSITS
-            )
-
-        elif text == "سحوباتي":
-
-            await agent_section(
-                update,
-                "قسم سحوباتي.",
-                STATE_AGENT_WITHDRAWALS
-            )
-
-        elif text == "إجمالي الإيداعات":
-
-            await agent_section(
-                update,
-                "قسم إجمالي الإيداعات.",
-                STATE_AGENT_DEPOSITS
-            )
-
-        elif text == "إجمالي السحوبات":
-
-            await agent_section(
-                update,
-                "قسم إجمالي السحوبات.",
-                STATE_AGENT_WITHDRAWALS
-            )
-
-        elif text == "المستخدمين المرتبطين":
-
-            await agent_section(
-                update,
-                "قسم المستخدمين المرتبطين.",
-                STATE_NONE
-            )
-
         return
 
 
@@ -652,6 +462,7 @@ async def message_handler(
 def main():
 
     if not BOT_TOKEN:
+
         raise ValueError(
             "BOT_TOKEN غير موجود في Railway Variables"
         )
