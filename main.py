@@ -1,49 +1,197 @@
 import os
 
-from telegram import Update, ReplyKeyboardMarkup
+from datetime import datetime, timedelta
+
+from telegram import (
+    Update,
+    ReplyKeyboardMarkup,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup
+)
+
 from telegram.ext import (
     Application,
+    ApplicationBuilder,
     CommandHandler,
+    MessageHandler,
+    CallbackQueryHandler,
     ContextTypes,
+    filters
 )
 
 
-# ==========================================
+# ==============================
 # الإعدادات
-# ==========================================
+# ==============================
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 
 ADMIN_ID = 8460661282
 
 
-# ==========================================
-# STATES
-# ==========================================
+
+# ==============================
+# حالات البوت
+# ==============================
 
 STATE_NONE = "none"
 
 STATE_DEPOSIT = "deposit"
 STATE_WITHDRAW = "withdraw"
-STATE_PACKAGES = "packages"
-STATE_PACKAGE_STATUS = "package_status"
-STATE_ACCOUNT = "account"
-STATE_REFERRAL = "referral"
+STATE_PACKAGE = "package"
+STATE_PACKAGE_CONFIRM = "package_confirm"
 STATE_SUPPORT = "support"
 
+# حالات الأدمن
 STATE_ADMIN_USERS = "admin_users"
+STATE_ADMIN_SEARCH = "admin_search"
+STATE_ADMIN_USER_ACTION = "admin_user_action"
+
 STATE_ADMIN_DEPOSITS = "admin_deposits"
 STATE_ADMIN_WITHDRAWALS = "admin_withdrawals"
+
 STATE_ADMIN_DEPOSIT_METHODS = "admin_deposit_methods"
 STATE_ADMIN_WITHDRAW_METHODS = "admin_withdraw_methods"
+
 STATE_ADMIN_BROADCAST = "admin_broadcast"
 STATE_ADMIN_SUPPORT = "admin_support"
+
 STATE_ADMIN_PACKAGES = "admin_packages"
 
 
-# ==========================================
+
+# ==============================
+# البيانات الأساسية
+# ==============================
+
+users = {}
+
+deposit_requests = []
+
+withdraw_requests = []
+
+support_requests = {}
+
+packages = {}
+
+deposit_methods = {}
+
+withdraw_methods = {}
+
+
+# ==============================
+# الإعدادات المالية
+# ==============================
+
+MIN_DEPOSIT = 10000
+
+MIN_WITHDRAW = 8000
+
+WITHDRAW_FEE = 1000
+
+PROFIT_PER_10000 = 500
+
+INVESTMENT_DAYS = 5
+
+
+# ==============================
+# إعدادات الباقات
+# ==============================
+
+MIN_PACKAGE = 10000
+
+MAX_PACKAGE = 15000000
+
+PACKAGE_DURATION = 5
+
+PROFIT_PER_10000 = 500
+
+
+# ==============================
+# المحافظ
+# ==============================
+
+deposit_methods = {}
+
+withdraw_methods = {}
+
+
+
+# ==============================
+# بيانات المستخدم
+# ==============================
+
+def create_user():
+    return {
+        "balance": 0,
+
+        "package": None,
+
+        "joined_at": datetime.now(),
+
+        "total_packages": 0,
+
+        "total_days": 0,
+
+        "total_deposits": 0,
+
+        "capital": 0,
+
+        "total_withdrawals": 0,
+
+        "total_profit": 0,
+
+        "referrals": 0,
+
+        "referral_earnings": 0,
+
+        "referrer": None,
+
+        "blocked": False,
+    }
+
+
+
+# ==============================
+# دوال المستخدم
+# ==============================
+
+def get_user(user_id):
+
+    if user_id not in users:
+        users[user_id] = create_user()
+
+    return users[user_id]
+
+
+# ==============================
+# دوال الـ State
+# ==============================
+
+def set_state(context, state):
+
+    context.user_data["state"] = state
+
+
+def get_state(context):
+
+    return context.user_data.get(
+        "state",
+        STATE_NONE
+    )
+
+
+def clear_state(context):
+
+    context.user_data.pop(
+        "state",
+        None
+    )
+
+
+# ==============================
 # كيبورد المستخدم
-# ==========================================
+# ==============================
 
 def user_keyboard(is_admin=False):
 
@@ -63,100 +211,3 @@ def user_keyboard(is_admin=False):
     )
 
 
-# ==========================================
-# كيبورد لوحة الإدارة
-# ==========================================
-
-def admin_keyboard():
-
-    keyboard = [
-        ["المستخدمين", "الإيداعات"],
-        ["السحوبات", "طرق الإيداع"],
-        ["طرق السحب", "رسالة جماعية"],
-        ["رسائل الدعم", "إدارة الباقات"],
-        ["رجوع"],
-    ]
-
-    return ReplyKeyboardMarkup(
-        keyboard,
-        resize_keyboard=True
-    )
-
-
-# ==========================================
-# رسالة الترحيب
-# ==========================================
-
-WELCOME_MESSAGE = """
-أهلاً بك في بوت 5day للاستثمار الذكي.
-
-يسعدنا انضمامك إلينا، نحن نوفر لك منصة آمنة وموثوقة لنمو رأس مالك من خلال خطط استثمارية قصيرة الأمد.
-
-تعريف برنامج الاستثمار:
-
-مدة الاستثمار: 5 أيام فقط لكل دورة استثمارية.
-
-نظام الأرباح: تحصل على ربح 500 دينار لكل 10,000 دينار.
-
-الشروط والأحكام:
-
-- يحق لكل مستخدم باقة واحدة فقط.
-- يتم تجميد رأس المال لمدة 5 أيام.
-- يمكن سحب الأرباح يومياً.
-- يمكن التجديد بعد انتهاء الباقة.
-- تتحرر الأرباح مع رأس المال بعد انتهاء المدة.
-"""
-
-
-# ==========================================
-# START
-# ==========================================
-
-async def start(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE
-):
-
-    user_id = update.effective_user.id
-
-    is_admin = user_id == ADMIN_ID
-
-    await update.message.reply_text(
-        WELCOME_MESSAGE,
-        reply_markup=user_keyboard(
-            is_admin=is_admin
-        )
-    )
-
-
-# ==========================================
-# تشغيل البوت
-# ==========================================
-
-def main():
-
-    if not BOT_TOKEN:
-        raise ValueError(
-            "BOT_TOKEN غير موجود في Railway Variables"
-        )
-
-    app = Application.builder().token(
-        BOT_TOKEN
-    ).build()
-
-    app.add_handler(
-        CommandHandler(
-            "start",
-            start
-        )
-    )
-
-    app.run_polling()
-
-
-# ==========================================
-# تشغيل
-# ==========================================
-
-if __name__ == "__main__":
-    main()
