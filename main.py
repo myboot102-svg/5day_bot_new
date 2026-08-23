@@ -406,33 +406,101 @@ async def message_handler(
 
     if user_id == ADMIN_ID:
 
-        if text == "المستخدمين":
+    if user.get("state") == STATE_ADMIN_USERS:
 
-    user["state"] = STATE_ADMIN_USERS
+        for uid, item in users.items():
 
-    keyboard = []
+            name = item.get("name") or "بدون اسم"
+            status = "محظور" if item.get("blocked") else "نشط"
 
-    for user_id, item in users.items():
+            if text == f"{name} | {status}":
 
-        name = item.get("name") or "بدون اسم"
+                user["selected_user_id"] = uid
+                user["state"] = STATE_ADMIN_USER_DETAILS
 
-        status = "محظور" if item.get("blocked") else "نشط"
+                if item.get("active_package"):
 
-        keyboard.append([
-            f"{name} | {status}"
-        ])
+                    package_text = (
+                        f"الباقة: {item['active_package']}\n"
+                        f"السعر: {item['package_price']:,}\n"
+                        f"المسحوب: {item['package_withdrawn']:,}\n"
+                        f"مدة الباقة: {item['package_total_days']} يوم\n"
+                        f"صارلها: {item['package_elapsed_days']} يوم\n"
+                        f"باقيلها: {item['package_remaining_days']} يوم"
+                    )
 
-    keyboard.append(["رجوع"])
+                else:
+                    package_text = "لا توجد باقة نشطة."
 
-    await update.message.reply_text(
-        "المستخدمين:",
-        reply_markup=ReplyKeyboardMarkup(
-            keyboard,
-            resize_keyboard=True
+                status_text = (
+                    "محظور"
+                    if item.get("blocked")
+                    else "نشط"
+                )
+
+                message = f"""
+معلومات المستخدم.
+
+الاسم: {item['name']}
+المعرف: @{item['username']}
+ID: {item['user_id']}
+
+الحالة: {status_text}
+
+{package_text}
+
+عدد الباقات: {item['total_packages']}
+إجمالي الأيام: {item['total_days']}
+
+إجمالي الإيداعات: {item['total_deposits']:,}
+رأس المال: {item['capital']:,}
+إجمالي السحوبات: {item['total_withdrawals']:,}
+
+الرصيد الحالي: {item['balance']:,}
+"""
+
+                keyboard = [
+                    ["إضافة رصيد", "خصم رصيد"],
+                    ["حظر المستخدم", "فك الحظر"],
+                    ["رجوع للمستخدمين"],
+                ]
+
+                await update.message.reply_text(
+                    message,
+                    reply_markup=ReplyKeyboardMarkup(
+                        keyboard,
+                        resize_keyboard=True
+                    )
+                )
+
+                return
+
+    if text == "المستخدمين":
+
+        user["state"] = STATE_ADMIN_USERS
+
+        keyboard = []
+
+        for uid, item in users.items():
+
+            name = item.get("name") or "بدون اسم"
+            status = "محظور" if item.get("blocked") else "نشط"
+
+            keyboard.append([
+                f"{name} | {status}"
+            ])
+
+        keyboard.append(["رجوع"])
+
+        await update.message.reply_text(
+            "المستخدمين:",
+            reply_markup=ReplyKeyboardMarkup(
+                keyboard,
+                resize_keyboard=True
+            )
         )
-    )
 
-    return
+        return
 
         elif text == "الإيداعات":
 
