@@ -211,3 +211,200 @@ def user_keyboard(is_admin=False):
     )
 
 
+# ==============================
+# كيبورد الأدمن
+# ==============================
+
+def admin_keyboard():
+
+    keyboard = [
+        ["المستخدمين", "الإيداعات"],
+        ["السحوبات", "طرق الإيداع"],
+        ["طرق السحب", "رسالة جماعية"],
+        ["رسائل الدعم", "إدارة الباقات"],
+        ["رجوع"],
+    ]
+
+    return ReplyKeyboardMarkup(
+        keyboard,
+        resize_keyboard=True
+    )
+
+
+# ==============================
+# رسالة الترحيب
+# ==============================
+
+WELCOME_MESSAGE = """
+أهلاً بك في بوت 5day للاستثمار الذكي.
+
+يسعدنا انضمامك إلينا، نحن نوفر لك منصة آمنة وموثوقة لنمو رأس مالك من خلال خطط استثمارية قصيرة الأمد.
+
+تعريف برنامج الاستثمار:
+
+مدة الاستثمار: 5 أيام فقط لكل دورة استثمارية.
+
+نظام الأرباح: تحصل على ربح 500 دينار لكل 10,000 دينار.
+
+الشروط والأحكام:
+
+- يحق لكل مستخدم باقة واحدة فقط.
+- يتم تجميد رأس المال لمدة 5 أيام.
+- يمكن سحب الأرباح يومياً.
+- يمكن التجديد بعد انتهاء الباقة.
+- تتحرر الأرباح مع رأس المال بعد انتهاء المدة.
+"""
+
+# ==============================
+# أمر /start
+# ==============================
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    if not update.message:
+        return
+
+    user_id = update.effective_user.id
+
+    # إنشاء المستخدم إذا أول مرة يدخل
+    user = get_user(user_id)
+
+    # التحقق إذا المستخدم محظور
+    if user.get("blocked"):
+        await update.message.reply_text(
+            "هذا الحساب محظور."
+        )
+        return
+
+    # إذا أدمن
+    if user_id == ADMIN_ID:
+
+        await update.message.reply_text(
+            WELCOME_MESSAGE,
+            reply_markup=user_keyboard(
+                is_admin=True
+            )
+        )
+
+    # إذا مستخدم عادي
+    else:
+
+        await update.message.reply_text(
+            WELCOME_MESSAGE,
+            reply_markup=user_keyboard()
+        )
+
+
+# ==============================
+# Handler الأزرار الأساسية
+# ==============================
+
+async def handle_user_buttons(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
+
+    if not update.message:
+        return
+
+    text = update.message.text
+    user_id = update.effective_user.id
+
+    user = get_user(user_id)
+
+    if user.get("blocked"):
+        await update.message.reply_text(
+            "هذا الحساب محظور."
+        )
+        return
+
+    # ------------------------------
+    # لوحة الإدارة
+    # ------------------------------
+
+    if text == "لوحة الإدارة":
+
+        if user_id != ADMIN_ID:
+            return
+
+        await update.message.reply_text(
+            "لوحة الإدارة:",
+            reply_markup=admin_keyboard()
+        )
+
+        return
+
+    # ------------------------------
+    # أزرار المستخدم
+    # ------------------------------
+
+    sections = {
+        "الباقات": "قسم الباقات.",
+        "حالة الباقة": "قسم حالة الباقة.",
+        "الإيداع": "قسم الإيداع.",
+        "السحب": "قسم السحب.",
+        "حسابي": "قسم حسابي.",
+        "الإحالة": "قسم الإحالة.",
+        "الدعم": "قسم الدعم.",
+    }
+
+    if text in sections:
+
+        await update.message.reply_text(
+            sections[text]
+        )
+
+        return
+
+    # ------------------------------
+    # رجوع
+    # ------------------------------
+
+    if text == "رجوع":
+
+        await update.message.reply_text(
+            "القائمة الرئيسية.",
+            reply_markup=user_keyboard(
+                is_admin=(user_id == ADMIN_ID)
+            )
+        )
+
+        return
+
+
+# ==============================
+# تشغيل البوت
+# ==============================
+
+def main():
+
+    if not BOT_TOKEN:
+        raise ValueError(
+            "BOT_TOKEN غير موجود في Railway Variables"
+        )
+
+    app = ApplicationBuilder().token(
+        BOT_TOKEN
+    ).build()
+
+    app.add_handler(
+        CommandHandler(
+            "start",
+            start
+        )
+    )
+
+    app.add_handler(
+        MessageHandler(
+            filters.TEXT & ~filters.COMMAND,
+            handle_user_buttons
+        )
+    )
+
+    print("5DAY Bot Started...")
+
+    app.run_polling()
+
+
+if __name__ == "__main__":
+    main()
