@@ -66,8 +66,25 @@ def get_user(user_id, update=None):
             "user_id": user_id,
             "name": name,
             "username": username,
+
             "role": "user",
             "state": STATE_NONE,
+
+            "blocked": False,
+            "balance": 0,
+
+            "active_package": None,
+            "package_price": 0,
+            "package_withdrawn": 0,
+            "package_total_days": 0,
+            "package_elapsed_days": 0,
+            "package_remaining_days": 0,
+
+            "total_packages": 0,
+            "total_days": 0,
+            "total_deposits": 0,
+            "capital": 0,
+            "total_withdrawals": 0,
         }
 
     return users[user_id]
