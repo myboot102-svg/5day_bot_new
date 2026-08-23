@@ -404,7 +404,7 @@ async def message_handler(
     # الأدمن
     # ==================================================
 
-    if user_id == ADMIN_ID:
+    
 
     if user.get("state") == STATE_ADMIN_USERS:
 
