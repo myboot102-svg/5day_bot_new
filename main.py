@@ -408,11 +408,31 @@ async def message_handler(
 
         if text == "المستخدمين":
 
-            await admin_section(
-                update,
-                "قسم المستخدمين.",
-                STATE_ADMIN_USERS
-            )
+    user["state"] = STATE_ADMIN_USERS
+
+    keyboard = []
+
+    for user_id, item in users.items():
+
+        name = item.get("name") or "بدون اسم"
+
+        status = "محظور" if item.get("blocked") else "نشط"
+
+        keyboard.append([
+            f"{name} | {status}"
+        ])
+
+    keyboard.append(["رجوع"])
+
+    await update.message.reply_text(
+        "المستخدمين:",
+        reply_markup=ReplyKeyboardMarkup(
+            keyboard,
+            resize_keyboard=True
+        )
+    )
+
+    return
 
         elif text == "الإيداعات":
 
